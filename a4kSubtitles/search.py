@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 
 def __auth_service(core, service_name, request):
-    service = core.services[service_name]
-    response = core.request.execute(core, request)
-    service.parse_auth_response(core, service_name, response)
+    try:
+        service = core.services[service_name]
+        response = core.request.execute(core, request)
+        service.parse_auth_response(core, service_name, response)
+    except Exception as e:
+        core.logger.error(f'Error in __auth_service for {service_name}: {str(e)}')
 
 def __query_service(core, service_name, meta, request, results):
     try:
@@ -22,6 +25,9 @@ def __query_service(core, service_name, meta, request, results):
             'count': len(service_results),
             'status_code': response.status_code if response else 'N/A'
         }, indent=2))
+    except Exception as e:
+        core.logger.error(f'Error in __query_service for {service_name}: {str(e)}')
+        service_results = []
     finally:
         core.progress_text = core.progress_text.replace(service.display_name, '')
         core.kodi.update_progress(core)
@@ -309,22 +315,28 @@ def __parse_languages(core, languages):
     return list({language for language in (core.kodi.parse_language(x) for x in languages) if language is not None})
 
 def __chain_auth_and_search_threads(core, auth_thread, search_thread):
-    auth_thread.start()
-    auth_thread.join()
-    search_thread.start()
-    search_thread.join()
+    try:
+        auth_thread.start()
+        auth_thread.join()
+        search_thread.start()
+        search_thread.join()
+    except Exception as e:
+        core.logger.error(f'Error in __chain_auth_and_search_threads: {str(e)}')
 
 def __wait_threads(core, request_threads):
-    threads = []
+    try:
+        threads = []
 
-    for (auth_thread, search_thread) in request_threads:
-        if not auth_thread:
-            threads.append(search_thread)
-        else:
-            thread = core.threading.Thread(target=__chain_auth_and_search_threads, args=(core, auth_thread, search_thread))
-            threads.append(thread)
+        for (auth_thread, search_thread) in request_threads:
+            if not auth_thread:
+                threads.append(search_thread)
+            else:
+                thread = core.threading.Thread(target=__chain_auth_and_search_threads, args=(core, auth_thread, search_thread))
+                threads.append(thread)
 
-    core.utils.wait_threads(threads)
+        core.utils.wait_threads(threads)
+    except Exception as e:
+        core.logger.error(f'Error in __wait_threads: {str(e)}')
 
 def __complete_search(core, results, meta):
     if core.api_mode_enabled:
@@ -333,88 +345,101 @@ def __complete_search(core, results, meta):
     __add_results(core, results, meta)  # pragma: no cover
 
 def __search(core, service_name, meta, results):
-    service = core.services[service_name]
-    requests = service.build_search_requests(core, service_name, meta)
-    core.logger.debug(lambda: '%s - %s' % (service_name, core.json.dumps(requests, default=lambda o: '', indent=2)))
+    try:
+        service = core.services[service_name]
+        requests = service.build_search_requests(core, service_name, meta)
+        core.logger.debug(lambda: '%s - %s' % (service_name, core.json.dumps(requests, default=lambda o: '', indent=2)))
 
-    threads = []
-    for request in requests:
-        thread = core.threading.Thread(target=__query_service, args=(core, service_name, meta, request, results))
-        threads.append(thread)
+        threads = []
+        for request in requests:
+            thread = core.threading.Thread(target=__query_service, args=(core, service_name, meta, request, results))
+            threads.append(thread)
 
-    core.utils.wait_threads(threads)
+        core.utils.wait_threads(threads)
+    except Exception as e:
+        core.logger.error(f'Error in __search for {service_name}: {str(e)}')
 
 def search(core, params):
-    # Check if manual metadata is provided
-    if 'manual_meta' in params:
-        meta = params['manual_meta']
-        core.last_meta = meta
-    else:
-        meta = core.video.get_meta(core)
-        core.last_meta = meta
+    try:
+        # Check if manual metadata is provided
+        if 'manual_meta' in params:
+            meta = params['manual_meta']
+            core.last_meta = meta
+        else:
+            meta = core.video.get_meta(core)
+            core.last_meta = meta
 
-    meta.languages = __parse_languages(core, core.utils.unquote(params['languages']).split(','))
-    meta.preferredlanguage = core.kodi.parse_language(params['preferredlanguage'])
-    core.logger.debug(lambda: core.json.dumps(meta, default=lambda o: '', indent=2))
+        meta.languages = __parse_languages(core, core.utils.unquote(params['languages']).split(','))
+        meta.preferredlanguage = core.kodi.parse_language(params['preferredlanguage'])
+        core.logger.debug(lambda: core.json.dumps(meta, default=lambda o: '', indent=2))
 
-    # For manual search, skip IMDB ID check or handle gracefully
-    if meta.imdb_id == '' and 'manual_meta' not in params:
-        core.logger.error('missing imdb id!')
-        core.kodi.notification('IMDB ID is not provided')
-        return
+        # For manual search, skip IMDB ID check or handle gracefully
+        if meta.imdb_id == '' and 'manual_meta' not in params:
+            core.logger.error('missing imdb id!')
+            core.kodi.notification('IMDB ID is not provided')
+            return
 
-    threads = []
-    (results, force_search) = __get_last_results(core, meta)
-    for service_name in core.services:
-        if len(results) > 0 and (__has_results(service_name, results) or service_name not in force_search):
-            continue
-
-        if not core.kodi.get_bool_setting(service_name, 'enabled'):
-            continue
-
-        service = core.services[service_name]
-        core.progress_text += service.display_name + '|'
-
-        auth_thread = None
-        auth_request = service.build_auth_request(core, service_name)
-        if auth_request:
-            auth_thread = core.threading.Thread(target=__auth_service, args=(core, service_name, auth_request))
-
-        search_thread = core.threading.Thread(target=__search, args=(core, service_name, meta, results))
-
-        threads.append((auth_thread, search_thread))
-
-    if len(threads) == 0:
-        return __complete_search(core, results, meta)
-
-    core.progress_text = core.progress_text[:-1]
-    core.kodi.update_progress(core)
-
-    ready_queue = core.utils.queue.Queue()
-    cancellation_token = lambda: None
-    cancellation_token.iscanceled = False
-
-    def check_cancellation():  # pragma: no cover
-        dialog = core.progress_dialog
-        while (core.progress_dialog is not None and not cancellation_token.iscanceled):
-            if not dialog.iscanceled():
-                core.time.sleep(1)
+        threads = []
+        (results, force_search) = __get_last_results(core, meta)
+        for service_name in core.services:
+            if len(results) > 0 and (__has_results(service_name, results) or service_name not in force_search):
                 continue
 
-            cancellation_token.iscanceled = True
-            final_results = __prepare_results(core, meta, results)
-            ready_queue.put(__complete_search(core, final_results, meta))
-            break
+            if not core.kodi.get_bool_setting(service_name, 'enabled'):
+                continue
 
-    def wait_all_results():
-        __wait_threads(core, threads)
-        if cancellation_token.iscanceled:
-            return
-        final_results = __prepare_results(core, meta, results)
-        __save_results(core, meta, final_results)
-        ready_queue.put(__complete_search(core, final_results, meta))
+            service = core.services[service_name]
+            core.progress_text += service.display_name + '|'
 
-    core.threading.Thread(target=check_cancellation).start()
-    core.threading.Thread(target=wait_all_results).start()
+            auth_thread = None
+            auth_request = service.build_auth_request(core, service_name)
+            if auth_request:
+                auth_thread = core.threading.Thread(target=__auth_service, args=(core, service_name, auth_request))
 
-    return ready_queue.get()
+            search_thread = core.threading.Thread(target=__search, args=(core, service_name, meta, results))
+
+            threads.append((auth_thread, search_thread))
+
+        if len(threads) == 0:
+            return __complete_search(core, results, meta)
+
+        core.progress_text = core.progress_text[:-1]
+        core.kodi.update_progress(core)
+
+        ready_queue = core.utils.queue.Queue()
+        cancellation_token = lambda: None
+        cancellation_token.iscanceled = False
+
+        def check_cancellation():  # pragma: no cover
+            try:
+                dialog = core.progress_dialog
+                while (core.progress_dialog is not None and not cancellation_token.iscanceled):
+                    if not dialog.iscanceled():
+                        core.time.sleep(1)
+                        continue
+
+                    cancellation_token.iscanceled = True
+                    final_results = __prepare_results(core, meta, results)
+                    ready_queue.put(__complete_search(core, final_results, meta))
+                    break
+            except Exception as e:
+                core.logger.error(f'Error in check_cancellation: {str(e)}')
+
+        def wait_all_results():
+            try:
+                __wait_threads(core, threads)
+                if cancellation_token.iscanceled:
+                    return
+                final_results = __prepare_results(core, meta, results)
+                __save_results(core, meta, final_results)
+                ready_queue.put(__complete_search(core, final_results, meta))
+            except Exception as e:
+                core.logger.error(f'Error in wait_all_results: {str(e)}')
+
+        core.threading.Thread(target=check_cancellation).start()
+        core.threading.Thread(target=wait_all_results).start()
+
+        return ready_queue.get()
+    except Exception as e:
+        core.logger.error(f'Error in search: {str(e)}')
+        return []
