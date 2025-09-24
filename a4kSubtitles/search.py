@@ -373,6 +373,7 @@ def search(core, params):
         meta.languages = __parse_languages(core, core.utils.unquote(params['languages']).split(','))
         meta.preferredlanguage = core.kodi.parse_language(params['preferredlanguage'])
         core.logger.debug(lambda: core.json.dumps(meta, default=lambda o: '', indent=2))
+        core.kodi.notification(f'Searching for: {meta.title} {meta.year}')  # Debug notification
 
         # For manual search, skip IMDB ID check or handle gracefully
         if meta.imdb_id == '' and 'manual_meta' not in params:

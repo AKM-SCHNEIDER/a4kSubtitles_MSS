@@ -51,9 +51,8 @@ def main(handle, paramstring):  # pragma: no cover
         # Use the provided search string if available
         searchstring = params.get('searchstring', '')
         if searchstring:
-            # Parse the search string to extract title, year, etc.
-            # Simple parsing: assume format like "Title (Year)" or "Title S01E01"
-            title = searchstring
+            # Use the full search string as title for better matching
+            title = searchstring.strip()
             year = ''
             season = ''
             episode = ''
@@ -76,9 +75,9 @@ def main(handle, paramstring):  # pragma: no cover
 
             # Create manual metadata
             manual_meta = utils.DictAsObject({
-                'title': title.strip(),
+                'title': title,
                 'year': year,
-                'tvshow': title.strip() if is_tvshow else '',
+                'tvshow': title if is_tvshow else '',
                 'season': season,
                 'episode': episode,
                 'imdb_id': '',
