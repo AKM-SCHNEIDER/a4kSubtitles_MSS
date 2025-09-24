@@ -48,37 +48,77 @@ def main(handle, paramstring):  # pragma: no cover
 
     params = dict(utils.parse_qsl(paramstring))
     if params['action'] == 'manualsearch':
-        # Prompt for manual input
-        dialog = core.kodi.xbmcgui.Dialog()
-        title = dialog.input('Enter movie/TV show title', type=core.kodi.xbmcgui.INPUT_ALPHANUM)
-        if not title:
-            return
-        year = dialog.input('Enter year (optional)', type=core.kodi.xbmcgui.INPUT_NUMERIC)
-        media_type = dialog.select('Select type', ['Movie', 'TV Show'])
-        if media_type == -1:
-            return
-        is_tvshow = media_type == 1
-        season = ''
-        episode = ''
-        if is_tvshow:
-            season = dialog.input('Enter season number', type=core.kodi.xbmcgui.INPUT_NUMERIC)
-            episode = dialog.input('Enter episode number', type=core.kodi.xbmcgui.INPUT_NUMERIC)
-            if not season or not episode:
-                return
+        # Use the provided search string if available
+        searchstring = params.get('searchstring', '')
+        if searchstring:
+            # Parse the search string to extract title, year, etc.
+            # Simple parsing: assume format like "Title (Year)" or "Title S01E01"
+            title = searchstring
+            year = ''
+            season = ''
+            episode = ''
+            is_tvshow = False
 
-        # Create manual metadata
-        manual_meta = utils.DictAsObject({
-            'title': title,
-            'year': year,
-            'tvshow': title if is_tvshow else '',
-            'season': season,
-            'episode': episode,
-            'imdb_id': '',
-            'is_tvshow': is_tvshow,
-            'is_movie': not is_tvshow,
-            'languages': ['en'],  # Default to English, can be customized
-            'preferredlanguage': 'en'
-        })
+            # Extract year if present
+            year_match = re.search(r'\((\d{4})\)', searchstring)
+            if year_match:
+                year = year_match.group(1)
+                title = re.sub(r'\s*\(\d{4}\)', '', title)
+
+            # Check for TV show format
+            tv_match = re.search(r'S(\d+)E(\d+)', searchstring, re.IGNORECASE)
+            if tv_match:
+                season = tv_match.group(1)
+                episode = tv_match.group(2)
+                is_tvshow = True
+                # Remove season/episode from title
+                title = re.sub(r'\s*S\d+E\d+', '', title, flags=re.IGNORECASE)
+
+            # Create manual metadata
+            manual_meta = utils.DictAsObject({
+                'title': title.strip(),
+                'year': year,
+                'tvshow': title.strip() if is_tvshow else '',
+                'season': season,
+                'episode': episode,
+                'imdb_id': '',
+                'is_tvshow': is_tvshow,
+                'is_movie': not is_tvshow,
+                'languages': ['en'],  # Default to English, can be customized
+                'preferredlanguage': 'en'
+            })
+        else:
+            # Fallback to prompts if no search string
+            dialog = core.kodi.xbmcgui.Dialog()
+            title = dialog.input('Enter movie/TV show title', type=core.kodi.xbmcgui.INPUT_ALPHANUM)
+            if not title:
+                return
+            year = dialog.input('Enter year (optional)', type=core.kodi.xbmcgui.INPUT_NUMERIC)
+            media_type = dialog.select('Select type', ['Movie', 'TV Show'])
+            if media_type == -1:
+                return
+            is_tvshow = media_type == 1
+            season = ''
+            episode = ''
+            if is_tvshow:
+                season = dialog.input('Enter season number', type=core.kodi.xbmcgui.INPUT_NUMERIC)
+                episode = dialog.input('Enter episode number', type=core.kodi.xbmcgui.INPUT_NUMERIC)
+                if not season or not episode:
+                    return
+
+            # Create manual metadata
+            manual_meta = utils.DictAsObject({
+                'title': title,
+                'year': year,
+                'tvshow': title if is_tvshow else '',
+                'season': season,
+                'episode': episode,
+                'imdb_id': '',
+                'is_tvshow': is_tvshow,
+                'is_movie': not is_tvshow,
+                'languages': ['en'],  # Default to English, can be customized
+                'preferredlanguage': 'en'
+            })
 
         # Set manual search params
         params['manual_meta'] = manual_meta

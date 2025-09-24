@@ -334,7 +334,7 @@ def __wait_threads(core, request_threads):
                 thread = core.threading.Thread(target=__chain_auth_and_search_threads, args=(core, auth_thread, search_thread))
                 threads.append(thread)
 
-        core.utils.wait_threads(threads)
+        core.utils.wait_threads(threads, timeout=30)  # Add timeout to prevent hanging
     except Exception as e:
         core.logger.error(f'Error in __wait_threads: {str(e)}')
 
@@ -439,7 +439,11 @@ def search(core, params):
         core.threading.Thread(target=check_cancellation).start()
         core.threading.Thread(target=wait_all_results).start()
 
-        return ready_queue.get()
+        try:
+            return ready_queue.get(timeout=60)  # Add timeout to prevent hanging
+        except:
+            core.logger.error('Search timed out')
+            return []
     except Exception as e:
         core.logger.error(f'Error in search: {str(e)}')
         return []
