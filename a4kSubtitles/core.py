@@ -127,9 +127,14 @@ def main(handle, paramstring):  # pragma: no cover
         params['action'] = 'search'  # Route to search
         core.progress_text = ''
         core.progress_dialog = kodi.get_progress_dialog()
+        core.kodi.update_progress(core)  # Show the progress dialog immediately
 
         try:
+            core.kodi.notification('Calling search')  # Debug notification
             search(core, params)
+        except Exception as e:
+            core.logger.error(f'Error in manual search: {str(e)}')
+            core.kodi.notification('Error in manual search')
         finally:
             core.progress_dialog.close()
             core.progress_dialog = None

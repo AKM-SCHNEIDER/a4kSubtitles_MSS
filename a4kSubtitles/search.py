@@ -361,6 +361,7 @@ def __search(core, service_name, meta, results):
 
 def search(core, params):
     try:
+        core.kodi.notification('Search started')  # Debug notification
         # Check if manual metadata is provided
         if 'manual_meta' in params:
             meta = params['manual_meta']
@@ -400,6 +401,7 @@ def search(core, params):
             threads.append((auth_thread, search_thread))
 
         if len(threads) == 0:
+            core.kodi.notification('No threads created')  # Debug notification
             return __complete_search(core, results, meta)
 
         core.progress_text = core.progress_text[:-1]
