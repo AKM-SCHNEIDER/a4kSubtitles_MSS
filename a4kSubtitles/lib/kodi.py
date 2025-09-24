@@ -177,3 +177,37 @@ def get_version_minor():
 
 def get_version_patch():
     return get_version()[2]
+
+def get_manual_search_input():
+    """Prompt user for manual search input and return metadata object."""
+    dialog = xbmcgui.Dialog()
+    title = dialog.input('Enter movie/TV show title', type=xbmcgui.INPUT_ALPHANUM)
+    if not title:
+        return None
+    year = dialog.input('Enter year (optional)', type=xbmcgui.INPUT_NUMERIC)
+    media_type = dialog.select('Select type', ['Movie', 'TV Show'])
+    if media_type == -1:
+        return None
+    is_tvshow = media_type == 1
+    season = ''
+    episode = ''
+    if is_tvshow:
+        season = dialog.input('Enter season number', type=xbmcgui.INPUT_NUMERIC)
+        episode = dialog.input('Enter episode number', type=xbmcgui.INPUT_NUMERIC)
+        if not season or not episode:
+            return None
+
+    from . import utils
+    manual_meta = utils.DictAsObject({
+        'title': title,
+        'year': year,
+        'tvshow': title if is_tvshow else '',
+        'season': season,
+        'episode': episode,
+        'imdb_id': '',
+        'is_tvshow': is_tvshow,
+        'is_movie': not is_tvshow,
+        'languages': ['en'],  # Default to English
+        'preferredlanguage': 'en'
+    })
+    return manual_meta

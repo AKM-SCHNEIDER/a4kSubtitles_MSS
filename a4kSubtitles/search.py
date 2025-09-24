@@ -345,14 +345,20 @@ def __search(core, service_name, meta, results):
     core.utils.wait_threads(threads)
 
 def search(core, params):
-    meta = core.video.get_meta(core)
-    core.last_meta = meta
+    # Check if manual metadata is provided
+    if 'manual_meta' in params:
+        meta = params['manual_meta']
+        core.last_meta = meta
+    else:
+        meta = core.video.get_meta(core)
+        core.last_meta = meta
 
     meta.languages = __parse_languages(core, core.utils.unquote(params['languages']).split(','))
     meta.preferredlanguage = core.kodi.parse_language(params['preferredlanguage'])
     core.logger.debug(lambda: core.json.dumps(meta, default=lambda o: '', indent=2))
 
-    if meta.imdb_id == '':
+    # For manual search, skip IMDB ID check or handle gracefully
+    if meta.imdb_id == '' and 'manual_meta' not in params:
         core.logger.error('missing imdb id!')
         core.kodi.notification('IMDB ID is not provided')
         return

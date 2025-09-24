@@ -430,3 +430,19 @@ def get_meta(core):
     except: pass
 
     return meta
+
+def create_manual_meta(title, year, tvshow, season, episode, imdb_id=''):
+    """Create a metadata object from manual input."""
+    meta = utils.DictAsObject({
+        'title': title,
+        'year': year,
+        'tvshow': tvshow,
+        'season': season,
+        'episode': episode,
+        'imdb_id': imdb_id,
+        'is_tvshow': bool(tvshow),
+        'is_movie': not bool(tvshow),
+        'languages': ['en'],
+        'preferredlanguage': 'en'
+    })
+    return meta

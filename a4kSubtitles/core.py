@@ -48,7 +48,49 @@ def main(handle, paramstring):  # pragma: no cover
 
     params = dict(utils.parse_qsl(paramstring))
     if params['action'] == 'manualsearch':
-        kodi.notification('Manual search is not supported')
+        # Prompt for manual input
+        dialog = core.kodi.xbmcgui.Dialog()
+        title = dialog.input('Enter movie/TV show title', type=core.kodi.xbmcgui.INPUT_ALPHANUM)
+        if not title:
+            return
+        year = dialog.input('Enter year (optional)', type=core.kodi.xbmcgui.INPUT_NUMERIC)
+        media_type = dialog.select('Select type', ['Movie', 'TV Show'])
+        if media_type == -1:
+            return
+        is_tvshow = media_type == 1
+        season = ''
+        episode = ''
+        if is_tvshow:
+            season = dialog.input('Enter season number', type=core.kodi.xbmcgui.INPUT_NUMERIC)
+            episode = dialog.input('Enter episode number', type=core.kodi.xbmcgui.INPUT_NUMERIC)
+            if not season or not episode:
+                return
+
+        # Create manual metadata
+        manual_meta = utils.DictAsObject({
+            'title': title,
+            'year': year,
+            'tvshow': title if is_tvshow else '',
+            'season': season,
+            'episode': episode,
+            'imdb_id': '',
+            'is_tvshow': is_tvshow,
+            'is_movie': not is_tvshow,
+            'languages': ['en'],  # Default to English, can be customized
+            'preferredlanguage': 'en'
+        })
+
+        # Set manual search params
+        params['manual_meta'] = manual_meta
+        params['action'] = 'search'  # Route to search
+        core.progress_text = ''
+        core.progress_dialog = kodi.get_progress_dialog()
+
+        try:
+            search(core, params)
+        finally:
+            core.progress_dialog.close()
+            core.progress_dialog = None
     elif params['action'] == 'search':
         core.progress_text = ''
         core.progress_dialog = kodi.get_progress_dialog()
