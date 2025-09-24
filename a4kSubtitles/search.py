@@ -385,11 +385,10 @@ def search(core, params):
             if len(results) > 0 and (__has_results(service_name, results) or service_name not in force_search):
                 continue
 
-            if not core.kodi.get_bool_setting(service_name, 'enabled'):
-                continue
-
-            service = core.services[service_name]
-            core.progress_text += service.display_name + '|'
+            # For manual search, enable all services
+            if 'manual_meta' in params or core.kodi.get_bool_setting(service_name, 'enabled'):
+                service = core.services[service_name]
+                core.progress_text += service.display_name + '|'
 
             auth_thread = None
             auth_request = service.build_auth_request(core, service_name)
