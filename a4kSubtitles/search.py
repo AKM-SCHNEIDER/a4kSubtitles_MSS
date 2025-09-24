@@ -25,6 +25,7 @@ def __query_service(core, service_name, meta, request, results):
             'count': len(service_results),
             'status_code': response.status_code if response else 'N/A'
         }, indent=2))
+        core.kodi.notification(f'{service_name}: {response.status_code if response else "N/A"} {len(service_results)} results')  # Debug notification
     except Exception as e:
         core.logger.error(f'Error in __query_service for {service_name}: {str(e)}')
         service_results = []
@@ -349,6 +350,7 @@ def __search(core, service_name, meta, results):
         service = core.services[service_name]
         requests = service.build_search_requests(core, service_name, meta)
         core.logger.debug(lambda: '%s - %s' % (service_name, core.json.dumps(requests, default=lambda o: '', indent=2)))
+        core.kodi.notification(f'{service_name}: {len(requests)} requests')  # Debug notification
 
         threads = []
         for request in requests:
