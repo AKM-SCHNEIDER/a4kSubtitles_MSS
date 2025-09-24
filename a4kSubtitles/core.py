@@ -122,6 +122,8 @@ def main(handle, paramstring):  # pragma: no cover
 
         # Set manual search params
         params['manual_meta'] = manual_meta
+        params['languages'] = 'en'  # Set default language
+        params['preferredlanguage'] = 'en'  # Set default preferred language
         params['action'] = 'search'  # Route to search
         core.progress_text = ''
         core.progress_dialog = kodi.get_progress_dialog()
